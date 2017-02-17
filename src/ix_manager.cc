@@ -71,11 +71,39 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 	cout << "Open Index File: " << file << endl;
 	RC err = pageManager->OpenFile(file.c_str(), *filehandle);
 	if (!err) {
+		// Initialize index handle
 		indexHandle.fileHandle = filehandle;
-		indexHandle.filename = file
+		indexHandle.fileName = file;
+		indexHandle.fileHeader = new PF_PageHandle();
+		err = filehandle->GetFirstPage(*indexHandle.fileHeader);
+		if (!err) {
+			// Get file header
+			char* pdata;
+			fileHeader->GetData(pdata);
+			indexHandle.hdr = (PF_FileHdr*) pdata;
+
+			// Apply root page if file is empty
+			if (hdr->firstFree == PF_PAGE_LIST_END) {
+				PF_PageHandle* root = new PF_PageHandle();
+				if (!indexHandle.fileHandle->AllocatePage(root))
+					indexHandle.root = root;
+				if (!root->GetData(pdata)) {
+					IX_NodeHeader* nhead = (IX_NodeHeader*) pdata;
+					nhead->nodeNum = 0;
+					nhead->IX_NodeType = ROOT | LEAF;
+				}
+				root->GetPageNum(hdr->firstFree);
+				++hdr->numPages;
+			}
+			cout << "PF_FileHeader: " << indexHandle.hdr->firstFree << ", " indexHandle.hdr->numPages << endl;
+		}
+		PF_PrintError(err);
+		cout << "Finish" << endl << endl;
+		return err;
 	}
 	PF_PrintError(err);
 	cout << "Finish" << endl << endl;
+	return err;
 }
 
 /*
@@ -84,8 +112,10 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 RC IX_Manager::CloseIndex(IX_IndexHandle &indexHandle) {
 	cout << "Close Index File: " << *indexHandle.fileName << endl;
 	RC err = pageManager->CloseFile(*indexHandle.fileHandle);
-	indexHandle.fileHandle = NULL;
-	indexHandle.fileName = NULL;
+	delete indexHandle.fileHandle;
+	delete indexHandle.fileName;
+	delete indexHandle.fileFirstPage;
 	PF_PrintError(err);
 	cout << "Finish" << endl << endl;
+	return err;
 }
