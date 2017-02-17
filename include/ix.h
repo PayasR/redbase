@@ -14,7 +14,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
-enum NodeType {
+
+
+
+
+enum IX_NodeType {
     ROOT = 1,
     LEAF = 2,
     NONLEAF = 4
@@ -23,24 +27,25 @@ enum NodeType {
 struct IX_Header {
     PF_PageHandle* parent;
     int nodeNum;
-    NodeType type;
+    IX_NodeType type;
 };
 
-struct Point {
+struct IX_Point {
     float x, y;
-    bool operator==(const Point& p) {
+    bool operator==(const IX_Point& p) {
         return p.x == x && p.y == y;
     }
 };
 
-struct MBR {
+struct IX_MBR {
     float lx, ly;
     float hx, hy;
-    bool in(const Point& p) {
+
+    bool in(const IX_Point& p) {
         return (p.x + 1e5F >= lx && p.y + 1e5F >= ly) && (p.x - 1e5F <= hx && p.y - 1e5F <= hy);
     }
 
-    float enlargeTest(const Point& p) {
+    float enlargeTest(const IX_Point& p) {
         if (in(p)) return 0.0F;
         float clx = min(lx, p.x);
         float cly = min(ly, p.y);
@@ -54,12 +59,12 @@ struct MBR {
 };
 
 struct IX_Entry {
-    MBR mbr;
+    IX_MBR mbr;
     PageNum child;
 };
 
 struct IX_Object {
-    Point point;
+    IX_Point point;
     RID rid;
 };
 
@@ -67,6 +72,13 @@ struct IX_Object {
 // IX_IndexHandle: IX Index File interface
 //
 class IX_IndexHandle {
+    private:
+        int ENTRY_M;
+        int ENTRY_m;
+        int OBJECT_M;
+        int OBJECT_m;
+        PF_FileHandle* fileHandle;
+        string* filename;
     public:
         IX_IndexHandle();
         ~IX_IndexHandle();
@@ -79,6 +91,7 @@ class IX_IndexHandle {
 
         // Force index files to disk
         RC ForcePages();
+
 };
 
 //
@@ -108,6 +121,9 @@ class IX_IndexScan {
 // IX_Manager: provides IX index file management
 //
 class IX_Manager {
+    private:
+        PF_Manager* pageManager;
+        const int INT_LENGTH = 11;
     public:
         IX_Manager(PF_Manager &pfm);
         ~IX_Manager();
