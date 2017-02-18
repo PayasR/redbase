@@ -178,11 +178,16 @@ PF_PageHandle* IX_IndexHandle::splitNode(IX_Object* obj, PF_PageHandle* L) {
 			else
 				nheadll->type = NONLEAF;
 
+			// Mark LL as dirty
 			LL->GetPageNum(pn);
 			fileHandle->MarkDirty(pn);
 
+			// Copy data from L for split
 			IX_Object* enll = (IX_Object*)((char*) nheadll + sizeof(IX_NodeHeader));
 			memcpy(enll, en + remain, sizeof(IX_Object) * nheadll->nodeNum);
+			nhead->nodeNum = remain;
+
+			// Mark file header as dirty
 			fileHeader->GetPageNum(pn);
 			fileHandle->MarkDirty(pn);
 			++hdr->numPages;
@@ -193,9 +198,44 @@ PF_PageHandle* IX_IndexHandle::splitNode(IX_Object* obj, PF_PageHandle* L) {
 
 RC IX_IndexHandle::adjustTree(PF_PageHandle * L, PF_PageHandle * LL) {
 	if (LL == NULL) {
-		// Only first update is based on Object
-		PF_PageHandle* par = stack.top().tpage;
-		IX_Entry* enpar = stack.top().tentry;
+		if (!stack.empty()) {
+			// Only first update is based on Object
+			PF_PageHandle* par = stack.top().tpage;
+			IX_Entry* enpar = stack.top().tentry;
+			IX_NodeHeader* nhead = getNodeHead(par);
+			if (nhead->enlargeNeed) {
+				updateMBRByObject(enpar->mbr, L);
+				nhead->sortNeed = true;
+			}
+			stack.pop();
+			delete L;
+			L = par;
+
+			// Update based on Entry
+			int size = stack.size();
+			for (int i = 0; i < size; ++i) {
+				par = stack.top().tpage;
+				enpar = stack.top().tentry;
+				nhead = getNodeHead(par);
+				if (nhead->enlargeNeed) {
+					updateMBRByEntry(enpar->mbr, L);
+					nhead->sortNeed = true;
+				}
+				delete L;
+				L = par;
+				stack.pop();
+			}
+			delete L;
+		}
+	} else {
+		PF_PageHandle* par;
+		IX_Entry* enpar;
+		if (!stack.empty()) {
+			par = stack.top().tpage;
+			enpar = stack.top().tentry;
+		} else {
+
+		}
 		IX_NodeHeader* nhead = getNodeHead(par);
 		if (nhead->enlargeNeed) {
 			updateMBRByObject(enpar->mbr, L);
@@ -204,23 +244,6 @@ RC IX_IndexHandle::adjustTree(PF_PageHandle * L, PF_PageHandle * LL) {
 		stack.pop();
 		delete L;
 		L = par;
-
-		// Update based on Entry
-		int size = stack.size();
-		for (int i = 0; i < size; ++i) {
-			par = stack.top().tpage;
-			enpar = stack.top().tentry;
-			nhead = getNodeHead(par);
-			if (nhead->enlargeNeed) {
-				updateMBRByEntry(enpar->mbr, L);
-				nhead->sortNeed = true;
-			}
-			delete L;
-			L = par;
-			stack.pop();
-		}
-	} else {
-		// implement
 	}
 }
 
