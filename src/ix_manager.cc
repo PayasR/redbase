@@ -29,13 +29,16 @@ IX_Manager::~IX_Manager() {
  */
 RC IX_Manager::CreateIndex(const char *fileName, int indexNo,
                            AttrType attrType, int attrLength) {
+	// Get intact file name
 	char* indexNostr = (char*) malloc(INT_LENGTH);
 	sprintf(indexNostr, "%d", indexNo);
 	string file(fileName);
 	file += indexNostr;
+
 	cout << "Create Index File: " << file << endl;
-	RC err = pageManager->CreateFile(file.c_str());
-	PF_PrintError(err);
+	RC err;
+	if (err = pageManager->CreateFile(file.c_str()))
+		PF_PrintError(err);
 	cout << "Finish" << endl << endl;
 	return err;
 
@@ -51,8 +54,9 @@ RC IX_Manager::DestroyIndex(const char *fileName, int indexNo) {
 	file += indexNostr;
 
 	cout << "Delete Index File: " << file << endl;
-	RC err = pageManager->DestroyFile(file.c_str());
-	PF_PrintError(err);
+	RC err;
+	if (err = pageManager->DestroyFile(file.c_str()))
+		PF_PrintError(err);
 	cout << "Finish" << endl << endl;
 }
 
@@ -66,52 +70,49 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 	sprintf(indexNostr, "%d", indexNo);
 	string* file = new string(fileName);
 	file->append(indexNostr);
-	PF_FileHandle* filehandle = new PF_FileHandle();
 
 	cout << "Open Index File: " << file << endl;
+	PF_FileHandle* filehandle = new PF_FileHandle();
 	RC err = pageManager->OpenFile(file.c_str(), *filehandle);
 	if (!err) {
 		// Initialize index handle
 		indexHandle.fileHandle = filehandle;
 		indexHandle.fileName = file;
-		indexHandle.fileHeader = new PF_PageHandle();
-		err = filehandle->GetFirstPage(*indexHandle.fileHeader);
+		indexHandle.fileHeaderPage = new PF_PageHandle();
+		err = filehandle->GetFirstPage(*indexHandle.fileHeaderPage);
 		if (!err) {
 			// Get file header
 			char* pdata;
-			fileHeader->GetData(pdata);
-			indexHandle.hdr = (PF_FileHdr*) pdata;
+			indexHandle.fileHeaderPage->GetData(pdata);
+			indexHandle.fileHeader = (PF_FileHdr*) pdata;
 
 			// Apply root page if file is empty
-			PF_PageHandle* root = new PF_PageHandle();
-			if (hdr->firstFree == PF_PAGE_LIST_END) {
-				if (!indexHandle.fileHandle->AllocatePage(*root)) {
+			PF_PageHandle* root;
+			if (indexHandle.fileHeader->firstFree == PF_PAGE_LIST_END) {
+				if (root = indexHandle.newPage(ROOT | LEAF)) {
 					indexHandle.root = root;
-					IX_NodeHeader* nhead;
-					if (nhead = indexHandle.getNodeHead(root)) {
-						int pn;
-						nhead->nodeNum = 0;
-						nhead->IX_NodeType = ROOT | LEAF;
-						root->GetPageNum(pn);
-						filehandle->MarkDirty(pn);
-						hdr->firstFree = pn; // Set root page number in file header
 
-						indexHandle.fileHeader->GetPageNum(pn);
-						filehandle->MarkDirty(pn);
-						++hdr->numPages;
-					} else
-						cout << "[IX_Manager::OpenIndex] Null Head Node" << endl;
-				}
-			} else if (!indexHandle.fileHandle->GetThisPage(hdr->firstFree, *root))
-				indexHandle.root = root;
-
-			cout << "PF_FileHeader: " << indexHandle.hdr->firstFree << ", " indexHandle.hdr->numPages << endl;
-		}
+					// Mark file header as dirty
+					int pn;
+					root->GetPageNum(pn);
+					indexHandle.fileHeader->firstFree = pn; // Set root page number in file header
+					indexHandle.fileHeader->numPages = 1;
+					indexHandle.markPageDirty(indexHandle.fileHeaderPage);
+				} else
+					cout << "[IX_Manager::OpenIndex] Null Page Alloc" << endl;
+			} else {
+				root = new PF_PageHandle();
+				if (!indexHandle.fileHandle->GetThisPage(indexHandle.fileHeader->firstFree, *root))
+					indexHandle.root = root;
+				else
+					cout << "[IX_Manager::OpenIndex] GetThisPage Error" << endl;
+			}
+			cout << "PF_FileHeader: " << indexHandle.fileHeader->firstFree << ", " <<
+			     indexHandle.fileHeader->numPages << endl;
+		} else
+			PF_PrintError(err);
+	} else
 		PF_PrintError(err);
-		cout << "Finish" << endl << endl;
-		return err;
-	}
-	PF_PrintError(err);
 	cout << "Finish" << endl << endl;
 	return err;
 }
@@ -125,7 +126,8 @@ RC IX_Manager::CloseIndex(IX_IndexHandle &indexHandle) {
 	delete indexHandle.fileHandle;
 	delete indexHandle.fileName;
 	delete indexHandle.fileFirstPage;
-	PF_PrintError(err);
+	delete indexHandle.root;
+	if (err) PF_PrintError(err);
 	cout << "Finish" << endl << endl;
 	return err;
 }

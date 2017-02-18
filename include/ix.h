@@ -16,34 +16,22 @@
 #include <algorithm>
 #include <statck>
 
-int sortObject(IX_Object& a, IX_Object& b) {
-	return a.point.x < b.point.x;
-}
+const int ROOT = 1;
+const int LEAF = 2;
+const int NONLEAF = 4;
 
-enum IX_NodeType {
-	ROOT = 1,
-	LEAF = 2,
-	NONLEAF = 4
-};
+template<class T>
+int sortMBR(T& a, T& b) {
+	return a.mbr.lx < b.mbr.lx;
+}
 
 struct IX_NodeHeader {
 	int nodeNum;
-	IX_NodeType type;
+	int type;
 	bool sortNeed;
 	bool enlargeNeed;
 };
 
-struct IX_Point {
-	float x, y;
-	bool operator==(const IX_Point& p) {
-		return p.x == x && p.y == y;
-	}
-
-	void operator=(const IX_Point& p) {
-		x = p.x;
-		y = p.y;
-	}
-};
 
 struct IX_MBR {
 	float lx, ly;
@@ -53,17 +41,25 @@ struct IX_MBR {
 		return (p.x + 1e5F >= lx && p.y + 1e5F >= ly) && (p.x - 1e5F <= hx && p.y - 1e5F <= hy);
 	}
 
-	float enlargeTest(const IX_Point& p) {
+	float enlargeTest(const IX_MBR& p) {
 		if (in(p)) return 0.0F;
-		float clx = min(lx, p.x);
-		float cly = min(ly, p.y);
-		float chx = max(hx, p.x);
-		float chy = max(hy, p.y);
+		float clx = min(lx, p.lx);
+		float cly = min(ly, p.ly);
+		float chx = max(hx, p.hx);
+		float chy = max(hy, p.hy);
 		float carea = (chy - cly) * (chx - clx);
 		float oarea = (hy - ly) * (hx - lx);
 		return carea - oarea;
 	}
 
+	bool operator==(const IX_MBR& p) {
+		return p.lx == lx && p.ly == ly && p.;
+	}
+
+	void operator=(const IX_MBR& p) {
+		lx = p.lx;
+		ly = p.ly;
+	}
 };
 
 struct IX_Entry {
@@ -72,11 +68,12 @@ struct IX_Entry {
 };
 
 struct IX_Object {
-	IX_Point point;
+	IX_MBR mbr;
 	RID rid;
-	IX_Object(IX_Point& pData, RID& id) {
+	IX_Object(IX_MBR* pData, RID& id) {
 		rid = id;
-		point = pData;
+		point.hx = point.lx = pData->lx;
+		point.hy = point.ly = pData->ly;
 	}
 };
 
@@ -96,22 +93,34 @@ class IX_IndexHandle {
 	private:
 		int ENTRY_M;
 		int ENTRY_m;
-		int OBJECT_M;
-		int OBJECT_m;
 		PF_FileHandle* fileHandle;
-		PF_PageHandle* fileHeader; // First page in file which stores location of root and pages of files
+		PF_PageHandle* fileHeaderPage; // First page in file which stores location of root and pages of files
+		PF_FileHdr* fileHeader;  // File header for first page
+
 		PF_PageHandle* root;  // Root node
 		string* fileName;
-		PF_FileHdr* hdr;  // File header for first page
 		stack<IX_Trace> trace;
 
 		bool pageFull(PF_PageHandle* page);
 		RC adjustTree(PF_PageHandle* L, PF_PageHandle* LL);
-		RC insertObject(IX_Object* obj, PF_PageHandle* L);
-		PF_PageHandle* splitNode(IX_Object* obj, PF_PageHandle* L);
 		PF_PageHandle* chooseLeaf(IX_Object* obj, PF_PageHandle* root);
-		void updateMBRByObject(PF_PageHandle* L);
-		void updateMBRByEntry(PF_PageHandle* L);
+		PF_PageHandle* newPage(int& type);
+		RC markPageDirty(PF_PageHandle* page);
+		IX_NodeHeader* getNodeHead(PF_PageHandle* node);
+		PF_PageHandle* findEnlargeLeast(IX_Object* obj, PF_PageHandle* node);
+
+		template<class T>
+		RC insertObject(IX_Object* obj, PF_PageHandle* L);
+
+		template<class T>
+		PF_PageHandle* splitNode(T* obj, PF_PageHandle* L);
+
+		template<class T>
+		void updateMBR(PF_PageHandle* L);
+
+		template<class T>
+		T* getDataList(IX_NodeHeader* nhead);
+
 	public:
 		IX_IndexHandle();
 		~IX_IndexHandle();
@@ -125,6 +134,7 @@ class IX_IndexHandle {
 		// Force index files to disk
 		RC ForcePages();
 
+		PF_PageHandle* newPage(IX_NodeType& type);
 };
 
 //
