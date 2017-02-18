@@ -83,9 +83,9 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 			indexHandle.hdr = (PF_FileHdr*) pdata;
 
 			// Apply root page if file is empty
+			PF_PageHandle* root = new PF_PageHandle();
 			if (hdr->firstFree == PF_PAGE_LIST_END) {
-				PF_PageHandle* root = new PF_PageHandle();
-				if (!indexHandle.fileHandle->AllocatePage(root))
+				if (!indexHandle.fileHandle->AllocatePage(*root))
 					indexHandle.root = root;
 				if (!root->GetData(pdata)) {
 					IX_NodeHeader* nhead = (IX_NodeHeader*) pdata;
@@ -94,7 +94,9 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 				}
 				root->GetPageNum(hdr->firstFree);
 				++hdr->numPages;
-			}
+			} else if (!indexHandle.fileHandle->GetThisPage(hdr->firstFree, *root))
+				indexHandle.root = root;
+
 			cout << "PF_FileHeader: " << indexHandle.hdr->firstFree << ", " indexHandle.hdr->numPages << endl;
 		}
 		PF_PrintError(err);
