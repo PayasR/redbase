@@ -160,7 +160,7 @@ IX_NodeHeader* IX_IndexHandle::getNodeHead(PF_PageHandle* node) {
 	return NULL;
 }
 
-// Need Template
+
 template<class T>
 PF_PageHandle* IX_IndexHandle::splitNode(T* obj, PF_PageHandle  L) {
 	IX_NodeHeader* nhead = getNodeHead(L);
@@ -211,62 +211,91 @@ RC IX_IndexHandle::adjustTree(PF_PageHandle* L, PF_PageHandle* LL) {
 			PF_PageHandle* par;
 			IX_Entry* enpar;
 			IX_NodeHeader* nhead;
-			int size = stack.size();
-			for (int i = 0; i < size; ++i) {
-				par = stack.top().tpage;
-				enpar = stack.top().tentry;
-				nhead = getNodeHead(par);
-				if (nhead->enlargeNeed) {
-					if (checkLeaf(L))
-						updateMBR<IX_Object>(enpar->mbr, L);
-					else
-						updateMBR<IX_Entry>(enpar->mbr, L);
-					nhead->sortNeed = true;
-				}
-				delete L;
-				L = par;
-				stack.pop();
+
+			par = stack.top().tpage;
+			enpar = stack.top().tentry;
+			nhead = getNodeHead(par);
+
+			if (nhead->enlargeNeed) {
+				if (checkLeaf(L))
+					updateMBR<IX_Object>(enpar->mbr, L);
+				else
+					updateMBR<IX_Entry>(enpar->mbr, L);
+
 			}
+			delete L;
+			L = par;
+			stack.pop();
+			return adjustTree(L, LL);
 		}
+		return 0;
 	} else {
-		/*
-		IX_NodeHeader* nheadL;
-		IX_NodeHeader* nheadLL;
-		PF_PageHandle* par;
-		IX_Entry* enpar;
-		IX_NodeHeader* nhead;
-		int size = stack.size();
-		for (int i = 0; i < size; ++i) {
+		int pn;
+		IX_Entry tmpen;
+		if (!stack.empty()) {
+			PF_PageHandle* par;
+			IX_Entry* enpar;
+			IX_NodeHeader* nhead;
+
 			par = stack.top().tpage;
 			enpar = stack.top().tentry;
 			nhead = getNodeHead(par);
 
 			if (checkLeaf(L))
-				updateMBR<IX_Object>(enpar->mbr, L);
+				updateMBR<IX_Object>(enpar, L);
 			else
-				updateMBR<IX_Entry>(enpar->mbr, L);
+				updateMBR<IX_Entry>(enpar, L);
 
-			IX_Entry tmpen;
 			if (checkLeaf(LL))
-				updateMBR<IX_Object>(tmpen->mbr, LL);
+				updateMBR<IX_Object>(tmpen, LL);
 			else
-				updateMBR<IX_Entry>(tmpen->mbr, LL);
+				updateMBR<IX_Entry>(tmpen, LL);
 
-			insertObject
+			LL->GetPageNum(pn);
+			tmpen.child = pn;
+			insertObject<IX_Entry>(&tmpen, par);
+
 			delete L;
+			delete LL;
+
+			if (pageFull(par))
+				LL = splitNode<IX_Entry>(par);
+			else
+				LL = NULL;
 			L = par;
 			stack.pop();
+			return adjustTree(L, LL);
+		} else {
+			IX_NodeHeader* nheadL = getNodeHead(L);
+			nheadL->type ^= ROOT;
+			root = newPage(ROOT | NONLEAF);
 
+			if (checkLeaf(L))
+				updateMBR<IX_Object>(tmpen.mbr, L);
+			else
+				updateMBR<IX_Entry>(tmpen.mbr, L);
+			L->GetPageNum(pn);
+			tmpen.child = pn;
+			insertObject<IX_Entry>(&tmpen, root);
+
+			if (checkLeaf(LL))
+				updateMBR<IX_Object>(tmpen.mbr, LL);
+			else
+				updateMBR<IX_Entry>(tmpen.mbr, LL);
+			LL->GetPageNum(pn);
+			tmpen.child = pn;
+			insertObject<IX_Entry>(&tmpen, root);
+			return 0;
 		}
-		*/
 	}
 }
 
 
+
 template<class T>
-void IX_IndexHandle::updateMBR(IX_MBR& mbr, PF_PageHandle* L) {
+void IX_IndexHandle::updateMBR(IX_Entry& entry, PF_PageHandle* L) {
 	IX_NodeHeader* nhead = getNodeHead(L);
-	T* obj = (T*)((char*) nhead + sizeof(IX_NodeHeader));
+	T* obj = getDataList<T>(nhead);
 	float lx, ly, hx, hy;
 	ly = lx = FLT_MAX;
 	hy = hx = FLT_MIN;
@@ -276,10 +305,13 @@ void IX_IndexHandle::updateMBR(IX_MBR& mbr, PF_PageHandle* L) {
 		hx = max(hx, obj[i].mbr.hx);
 		hy = max(hy, obj[i].mbr.hy);
 	}
-	mbr.lx = lx;
-	mbr.ly = ly;
-	mbr.hx = hx;
-	mbr.hy = hy;
+	entry->mbr.lx = lx;
+	entry->mbr.ly = ly;
+	entry->mbr.hx = hx;
+	entry->mbr.hy = hy;
+	nhead = getNodeHead(entry);
+	nhead->enlargeNeed = false;
+	nhead->sortNeed = true;
 	return;
 }
 
