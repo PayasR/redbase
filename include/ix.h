@@ -20,8 +20,8 @@ const int ROOT = 1;
 const int LEAF = 2;
 const int NONLEAF = 4;
 
-template<class T>
-int sortMBR(T& a, T& b) {
+
+int sortMBR(IX_Entry& a, IX_Entry& b) {
 	return a.mbr.lx < b.mbr.lx;
 }
 
@@ -52,22 +52,15 @@ struct IX_MBR {
 		return carea - oarea;
 	}
 
-	bool operator==(const IX_MBR& p) {
-		return p.lx == lx && p.ly == ly && p.;
-	}
-
 	void operator=(const IX_MBR& p) {
 		lx = p.lx;
 		ly = p.ly;
+		hx = p.hx;
+		hy = p.hy;
 	}
 };
 
 struct IX_Entry {
-	IX_MBR mbr;
-	PageNum child;
-};
-
-struct IX_Object {
 	IX_MBR mbr;
 	RID rid;
 	IX_Object(IX_MBR* pData, RID& id) {
@@ -103,23 +96,19 @@ class IX_IndexHandle {
 
 		bool pageFull(PF_PageHandle* page);
 		RC adjustTree(PF_PageHandle* L, PF_PageHandle* LL);
-		PF_PageHandle* chooseLeaf(IX_Object* obj, PF_PageHandle* root);
+		PF_PageHandle* chooseLeaf(IX_Entry* obj, PF_PageHandle* root);
 		PF_PageHandle* newPage(int& type);
 		RC markPageDirty(PF_PageHandle* page);
 		IX_NodeHeader* getNodeHead(PF_PageHandle* node);
-		PF_PageHandle* findEnlargeLeast(IX_Object* obj, PF_PageHandle* node);
+		PF_PageHandle* findEnlargeLeast(IX_Entry* obj, PF_PageHandle* node);
 
-		template<class T>
-		RC insertObject(IX_Object* obj, PF_PageHandle* L);
+		RC insertObject(IX_Entry* obj, PF_PageHandle* L);
 
-		template<class T>
-		PF_PageHandle* splitNode(T* obj, PF_PageHandle* L);
+		PF_PageHandle* splitNode(IX_Entry* obj, PF_PageHandle* L);
 
-		template<class T>
 		void updateMBR(PF_PageHandle* L);
 
-		template<class T>
-		T* getDataList(IX_NodeHeader* nhead);
+		IX_Entry* getDataList(IX_NodeHeader* nhead);
 
 	public:
 		IX_IndexHandle();
