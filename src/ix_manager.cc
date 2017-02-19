@@ -91,7 +91,8 @@ RC IX_Manager::OpenIndex(const char *fileName, int indexNo,
 			if (indexHandle.fileHeader->firstFree == PF_PAGE_LIST_END) {
 				if (root = indexHandle.newPage(ROOT | LEAF)) {
 					indexHandle.root = root;
-
+					IX_NodeHeader* nhead = indexHandle.getNodeHead(root);
+					nhead->level = 0;
 					// Mark file header as dirty
 					int pn;
 					root->GetPageNum(pn);

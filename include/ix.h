@@ -28,6 +28,7 @@ int sortMBR(IX_Entry& a, IX_Entry& b) {
 struct IX_NodeHeader {
 	int nodeNum;
 	int type;
+	int level;
 	bool sortNeed;
 	bool enlargeNeed;
 };
@@ -63,7 +64,7 @@ struct IX_MBR {
 struct IX_Entry {
 	IX_MBR mbr;
 	RID rid;
-	IX_Object(IX_MBR* pData, RID& id) {
+	IX_Entry(IX_MBR* pData, RID& id) {
 		rid = id;
 		point.hx = point.lx = pData->lx;
 		point.hy = point.ly = pData->ly;
@@ -77,6 +78,11 @@ struct IX_Trace {
 		tpage = page;
 		tentry = entry;
 	}
+}
+
+struct IX_ReinEntry {
+	IX_Entry entry;
+	int level;
 }
 
 //
@@ -103,13 +109,10 @@ class IX_IndexHandle {
 		PF_PageHandle* findEnlargeLeast(IX_Entry* obj, PF_PageHandle* node);
 
 		RC insertObject(IX_Entry* obj, PF_PageHandle* L);
-
 		PF_PageHandle* splitNode(IX_Entry* obj, PF_PageHandle* L);
-
-		void updateMBR(PF_PageHandle* L);
-
+		void updateMBR(IX_Entry* entry, PF_PageHandle* L);
 		IX_Entry* getDataList(IX_NodeHeader* nhead);
-
+		int getPageLevel(PF_PageHandle* node);
 	public:
 		IX_IndexHandle();
 		~IX_IndexHandle();
