@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <parser_internal.h>
 #include "redbase.h"
 #include "parser_internal.h"
 #include "y.tab.h"
@@ -285,6 +286,8 @@ NODE *value_node(AttrType type, void *value)
     case STRING:
       n->u.VALUE.sval = (char *)value;
       break;
+    case _MBR:
+        n->u.VALUE.mval = *(MBR *) value;
     }
     return n;
 }

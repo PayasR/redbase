@@ -120,6 +120,8 @@ QL_Manager *pQlm;          // QL component manager
       T_QSTRING
       T_SHELL_CMD
 
+%token    <mval>   T_MBR
+
 %type   <cval>   op
 
 %type   <sval>   opt_relname
@@ -629,7 +631,7 @@ ostream &operator<<(ostream &s, const AttrInfo &ai)
       << " attrType=" << 
       (ai.attrType == INT ? "INT" :
        ai.attrType == FLOAT ? "FLOAT" :
-       ai.attrType == MBR ? "MBR" : "STRING")
+       ai.attrType == _MBR ? "MBR" : "STRING")
       << " attrLength=" << ai.attrLength;
 }
 
@@ -665,7 +667,10 @@ ostream &operator<<(ostream &s, const Value &v)
          s << " (char *)data=" << (char *)v.data;
          break;
       case _MBR:
-         s << " (MBR *)data" << (MBR *)v.data;
+         s << " (*(MBR *)data).X_left=" << (*(MBR *)v.data).X_left<<",";
+         s << " (*(MBR *)data).X_right=" << (*(MBR *)v.data).X_right<<",";
+         s << " (*(MBR *)data).Y_bottom=" << (*(MBR *)v.data).Y_bottom<<",";
+         s << " (*(MBR *)data).Y_top=" << (*(MBR *)v.data).Y_top<<".";
          break;
    }
    return s;
@@ -710,6 +715,9 @@ ostream &operator<<(ostream &s, const AttrType &at)
          break;
       case STRING:
          s << "STRING";
+         break;
+      case _MBR:
+         s << "MBR";
          break;
    }
    return s;
