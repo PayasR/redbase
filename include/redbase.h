@@ -60,7 +60,8 @@ const int ALL_PAGES = -1;
 enum AttrType {
     INT,
     FLOAT,
-    STRING
+    STRING,
+    MBR                                         // minimum boundary rec for spatial data, contains 4 float values: X_left, X_right, Y_bottom, Y_top
 };
 
 //
