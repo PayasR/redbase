@@ -35,6 +35,8 @@ s_num                [+\-]?{num}
                       return T_REAL;}
 {s_num}\.{num}[Ee]{s_num}   {sscanf(yytext, "%f", &yylval.rval);
                              return T_REAL;}
+\[(({s_num}(?:\b|\.{num}(?:\b|[Ee]{s_sum}))),){3}({s_num}(?:\b|\.{num}(?:\b|[Ee]{s_sum})))\]     {sscanf(yytext,"[%f,%f,%f,%f]", &yylval.mval.X_left, &yylval.mval.X_right, &yylval.mval.Y_bottom, &yylval.mval.Y_top);
+                                                                    return T_MBR;}
 \"([^\"\n]|(\"\"))*\"       {yylval.sval = get_qstring(yytext, yyleng);
                              return T_QSTRING;}
 \"([^\"\n]|(\"\"))*\n       {printf("newline in string constant\n");}
