@@ -509,6 +509,10 @@ value
    {
       $$ = value_node(FLOAT, (void *)& $1);
    }
+   | T_MBR
+   {
+      $$ = value_node(_MBR, (void *)& $1);
+   }
    ;
 
 opt_relname
@@ -624,7 +628,8 @@ ostream &operator<<(ostream &s, const AttrInfo &ai)
       s << " attrName=" << ai.attrName
       << " attrType=" << 
       (ai.attrType == INT ? "INT" :
-       ai.attrType == FLOAT ? "FLOAT" : "STRING")
+       ai.attrType == FLOAT ? "FLOAT" :
+       ai.attrType == MBR ? "MBR" : "STRING")
       << " attrLength=" << ai.attrLength;
 }
 
@@ -658,6 +663,9 @@ ostream &operator<<(ostream &s, const Value &v)
          break;
       case STRING:
          s << " (char *)data=" << (char *)v.data;
+         break;
+      case _MBR:
+         s << " (MBR *)data" << (MBR *)v.data;
          break;
    }
    return s;
