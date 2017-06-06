@@ -60,8 +60,16 @@ const int ALL_PAGES = -1;
 enum AttrType {
     INT,
     FLOAT,
-    STRING
+    STRING,
+    _MBR                                         // minimum boundary rec for spatial data, contains 4 float values: X_left, X_right, Y_bottom, Y_top
 };
+
+typedef struct{
+    float X_left;
+    float X_right;
+    float Y_bottom;
+    float Y_top;
+}MBR;
 
 //
 // Comparison operators
