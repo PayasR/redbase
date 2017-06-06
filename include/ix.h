@@ -13,69 +13,169 @@
 #include <string>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
+#include <statck>
+
+const int ROOT = 1;
+const int LEAF = 2;
+const int NONLEAF = 4;
+
+
+int sortMBR(IX_Entry& a, IX_Entry& b) {
+	return a.mbr.lx < b.mbr.lx;
+}
+
+struct IX_NodeHeader {
+	int nodeNum;
+	int type;
+	int level;
+	bool sortNeed;
+	bool enlargeNeed;
+};
+
+
+struct IX_MBR {
+	float lx, ly;
+	float hx, hy;
+
+	bool in(const IX_Point& p) {
+		return (p.x + 1e5F >= lx && p.y + 1e5F >= ly) && (p.x - 1e5F <= hx && p.y - 1e5F <= hy);
+	}
+
+	float enlargeTest(const IX_MBR& p) {
+		if (in(p)) return 0.0F;
+		float clx = min(lx, p.lx);
+		float cly = min(ly, p.ly);
+		float chx = max(hx, p.hx);
+		float chy = max(hy, p.hy);
+		float carea = (chy - cly) * (chx - clx);
+		float oarea = (hy - ly) * (hx - lx);
+		return carea - oarea;
+	}
+
+	void operator=(const IX_MBR& p) {
+		lx = p.lx;
+		ly = p.ly;
+		hx = p.hx;
+		hy = p.hy;
+	}
+};
+
+struct IX_Entry {
+	IX_MBR mbr;
+	RID rid;
+	IX_Entry(IX_MBR* pData, RID& id) {
+		rid = id;
+		point.hx = point.lx = pData->lx;
+		point.hy = point.ly = pData->ly;
+	}
+};
+
+struct IX_Trace {
+	PF_PageHandle* tpage;
+	IX_Entry* tentry;
+	IX_Trace(PF_PageHandle* page, IX_Entry* entry) {
+		tpage = page;
+		tentry = entry;
+	}
+}
+
+struct IX_ReinEntry {
+	IX_Entry entry;
+	int level;
+}
 
 //
 // IX_IndexHandle: IX Index File interface
 //
 class IX_IndexHandle {
-public:
-    IX_IndexHandle();
-    ~IX_IndexHandle();
+	private:
+		int ENTRY_M;
+		int ENTRY_m;
+		PF_FileHandle* fileHandle;
+		PF_PageHandle* fileHeaderPage; // First page in file which stores location of root and pages of files
+		PF_FileHdr* fileHeader;  // File header for first page
 
-    // Insert a new index entry
-    RC InsertEntry(void *pData, const RID &rid);
+		PF_PageHandle* root;  // Root node
+		string* fileName;
+		stack<IX_Trace> trace;
 
-    // Delete a new index entry
-    RC DeleteEntry(void *pData, const RID &rid);
+		bool pageFull(PF_PageHandle* page);
+		RC adjustTree(PF_PageHandle* L, PF_PageHandle* LL);
+		PF_PageHandle* chooseLeaf(IX_Entry* obj, PF_PageHandle* root);
+		PF_PageHandle* newPage(int& type);
+		RC markPageDirty(PF_PageHandle* page);
+		IX_NodeHeader* getNodeHead(PF_PageHandle* node);
+		PF_PageHandle* findEnlargeLeast(IX_Entry* obj, PF_PageHandle* node);
 
-    // Force index files to disk
-    RC ForcePages();
+		RC insertObject(IX_Entry* obj, PF_PageHandle* L);
+		PF_PageHandle* splitNode(IX_Entry* obj, PF_PageHandle* L);
+		void updateMBR(IX_Entry* entry, PF_PageHandle* L);
+		IX_Entry* getDataList(IX_NodeHeader* nhead);
+		int getPageLevel(PF_PageHandle* node);
+	public:
+		IX_IndexHandle();
+		~IX_IndexHandle();
+
+		// Insert a new index entry
+		RC InsertEntry(void *pData, const RID &rid);
+
+		// Delete a new index entry
+		RC DeleteEntry(void *pData, const RID &rid);
+
+		// Force index files to disk
+		RC ForcePages();
+
+		PF_PageHandle* newPage(IX_NodeType& type);
 };
 
 //
 // IX_IndexScan: condition-based scan of index entries
 //
 class IX_IndexScan {
-public:
-    IX_IndexScan();
-    ~IX_IndexScan();
+	public:
+		IX_IndexScan();
+		~IX_IndexScan();
 
-    // Open index scan
-    RC OpenScan(const IX_IndexHandle &indexHandle,
-                CompOp compOp,
-                void *value,
-                ClientHint  pinHint = NO_HINT);
+		// Open index scan
+		RC OpenScan(const IX_IndexHandle &indexHandle,
+		            CompOp compOp,
+		            void *value,
+		            ClientHint  pinHint = NO_HINT);
 
 
-    // Get the next matching entry return IX_EOF if no more matching
-    // entries.
-    RC GetNextEntry(RID &rid);
+		// Get the next matching entry return IX_EOF if no more matching
+		// entries.
+		RC GetNextEntry(RID &rid);
 
-    // Close index scan
-    RC CloseScan();
+		// Close index scan
+		RC CloseScan();
 };
 
 //
 // IX_Manager: provides IX index file management
 //
 class IX_Manager {
-public:
-    IX_Manager(PF_Manager &pfm);
-    ~IX_Manager();
+	private:
+		PF_Manager* pageManager;
+		const int INT_LENGTH = 11;
+	public:
+		IX_Manager(PF_Manager &pfm);
+		~IX_Manager();
 
-    // Create a new Index
-    RC CreateIndex(const char *fileName, int indexNo,
-                   AttrType attrType, int attrLength);
+		// Create a new Index
+		RC CreateIndex(const char *fileName, int indexNo,
+		               AttrType attrType, int attrLength);
 
-    // Destroy and Index
-    RC DestroyIndex(const char *fileName, int indexNo);
+		// Destroy and Index
+		RC DestroyIndex(const char *fileName, int indexNo);
 
-    // Open an Index
-    RC OpenIndex(const char *fileName, int indexNo,
-                 IX_IndexHandle &indexHandle);
+		// Open an Index
+		RC OpenIndex(const char *fileName, int indexNo,
+		             IX_IndexHandle &indexHandle);
 
-    // Close an Index
-    RC CloseIndex(IX_IndexHandle &indexHandle);
+		// Close an Index
+		RC CloseIndex(IX_IndexHandle &indexHandle);
 };
 
 //
